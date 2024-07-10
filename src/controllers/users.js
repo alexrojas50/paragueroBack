@@ -27,7 +27,7 @@ export class usersController {
 
     static async getUsers(req, res) {
         try {
-            const { userId } = req.body
+            const { userId, level, isForCourse } = req.query
 
             const filter = { active: true, level: { $nin: [1] } }
 
@@ -38,9 +38,18 @@ export class usersController {
                 return res.send(userFind)
             }
 
-            const usersFind = await User.find(filter, { password: 0 })
+            if (level == 3) filter.level.$nin.push(2); else filter.level.$nin.push(3);
+            console.log('FILTERR ', filter);
+            let usersFind = await User.find(filter, { password: 0 })
+
+            if (isForCourse) {
+                usersFind = usersFind.map((e) => {
+                    return { label: `${e.name} - ${e.CI}`, id: e._id }
+                })
+            }
             return res.status(202).json(usersFind)
         } catch (error) {
+            console.log('ERROR ', error);
             if (error.message) return res.status(400).json({ error: error.message })
             return res.status(400).json({ error })
         }
@@ -48,16 +57,18 @@ export class usersController {
 
     static async createUser(req, res) {
         try {
-            const { userName, password, userEmail, phone } = req.body
-            console.log('REQ BODY ', req.body);
+            const { userName, password, userEmail, phone, CIUser, level } = req.body
 
-            if (!userName || !password || !userEmail || !phone) return res.status(400).json({ error: 'Completa todos los campos' })
+            if (!userName || !password || !userEmail || !phone || !CIUser) return res.status(400).json({ error: 'Completa todos los campos' })
 
+
+            if (level && req.user.level != 1) return res.status(400).json({ error: 'Solo el adminitrador puede crear profesores' })
+            if (level && ![1, 2, 3].includes(level)) return res.status(400).json({ error: 'Nivel de usuario inválido' })
             const newHashPassword = await generateHash(password)
 
             // Realizar validaciones para username and password
 
-            const newUser = new User({ name: userName, password: newHashPassword, email: userEmail, level: 2, phone: phone })
+            const newUser = new User({ name: userName, password: newHashPassword, email: userEmail, level: level ? level : 2, phone: phone, CI: CIUser })
             await newUser.save()
 
             const initToken = await createJWT({ name: newUser.userName, email: newUser.userEmail })

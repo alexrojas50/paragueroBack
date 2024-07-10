@@ -5,7 +5,7 @@ import moment from 'moment'
 export class meetController {
     static async getMeets(req, res) {
         try {
-            const { meetId, date, endDate, courseId, isForInscribe } = req.query
+            const { meetId, date, endDate, courseId, isForInscribe, getLasts } = req.query
 
             const filter = {}
 
@@ -21,11 +21,66 @@ export class meetController {
                 return res.send(meetFind)
             }
 
+            if (getLasts) {
+                const courseIdArray = await Course.find().then((res) => res.map(e => e._id))
+                const lastMeets = await Meets.aggregate([
+                    {
+                        $match: {
+                            course: { $in: courseIdArray },
+                            fullDate: { $gte: new Date() }
+                        }
+                    },
+                    {
+                        $sort: {
+                            fullDate: 1
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: "$course",
+                            closestMeet: { $first: "$$ROOT" }
+                        }
+                    },
+                    {
+                        $replaceRoot: {
+                            newRoot: "$closestMeet"
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: "courses",
+                            localField: "course",
+                            foreignField: "_id",
+                            as: "courseData"
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: "rooms",
+                            localField: "room",
+                            foreignField: "_id",
+                            as: "roomData"
+                        }
+                    },
+                    {
+                        $unwind: "$courseData"
+                    },
+                    {
+                        $unwind: "$roomData"
+                    },
+                    {
+                        $addFields: {
+                            date: { $dateToString: { format: "%d/%m/%Y", date: "$fullDate" } },
+                            time: { $dateToString: { format: "%H:%M", date: "$fullDate" } }
+                        }
+                    }
+                ])
+                return res.send(lastMeets)
+            }
+
             if (courseId) filter.course = courseId
 
-
-
-            let meetsFind = (await Meets.find(filter, { users: 0 }).populate(['course', 'room'])).map(e => {
+            let meetsFind = (await Meets.find(filter, { users: 0 }).populate([{ path: 'course', populate: {path:'teacher', select: '-password'} }, 'room'])).map(e => {
                 return { course: e.course, room: e.room, date: new Date(e.fullDate).toLocaleDateString(), time: new Date(e.fullDate).toLocaleTimeString().toUpperCase(), _id: e._id }
             })
 
@@ -37,6 +92,7 @@ export class meetController {
             }
             return res.send(meetsFind)
         } catch (error) {
+            console.log('ERROR ', error);
             if (error.message) return res.status(400).json({ error: error.message })
             return res.status(400).json({ error })
         }

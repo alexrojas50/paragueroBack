@@ -1,4 +1,5 @@
 import Course from '../models/courses.js'
+import User from '../models/user.js'
 
 export class courseController {
     static async getCourse(req, res) {
@@ -13,7 +14,7 @@ export class courseController {
 
             if (courseId) {
                 filter._id = courseId
-                const courseFind = await Course.findOne(filter)
+                const courseFind = await Course.findOne(filter).populate({ path: 'teacher', select: '-password' })
                 if (!courseFind) return res.status(400).json({ error: 'Curso no encontrado' })
                 return res.send(courseFind)
             }
@@ -21,13 +22,13 @@ export class courseController {
             if (teacher) filter.teacher = courseId
             if (hours) filter.hours = courseId
 
-            let coursesFind = await Course.find(filter)
+            let coursesFind = await Course.find(filter).populate({ path: 'teacher', select: '-password' })
 
 
             if (isForMeets) {
                 coursesFind = coursesFind.map((e) => {
                     // return { label: e.name, value: e.name, id: e._id }
-                    return { label: `${e.name} - ${e.teacher}`,  id: e._id }
+                    return { label: `${e.name} - ${e.teacher.name}`, id: e._id }
                 })
             }
             return res.send(coursesFind)
@@ -44,7 +45,12 @@ export class courseController {
 
             // Realizar validaciones para username and password
 
-            const newCourse = new Course({ name: courseName, teacher: courseTeacher, hours: courseHours, description: courseDescription })
+            const teacher = await User.findOne({ _id: courseTeacher })
+
+            if (!teacher) return res.status(400).json({ error: 'No se ha encontrado a este profesor' })
+            if (teacher.level !== 3) return res.status(400).json({ error: 'Este usuario no es un profesor' })
+
+            const newCourse = new Course({ name: courseName, teacher: teacher._id, hours: courseHours, description: courseDescription })
             await newCourse.save()
 
             return res.status(202).json({ message: "Se ha creado el curso correctamente" })

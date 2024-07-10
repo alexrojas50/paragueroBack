@@ -16,7 +16,11 @@ const Users = new Schema({
     },
     phone: {
         type: String,
-        unique: true
+        // unique: true
+    },
+    CI: {
+        type: String,
+        // unique: true
     },
     level: {
         type: Number,

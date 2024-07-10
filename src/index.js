@@ -10,6 +10,7 @@ import { courseRouter } from './routes/course.js'
 import { backupRouter } from './routes/backup.js'
 import { roomRouter } from './routes/rooms.js';
 import { meetRouter } from './routes/meets.js';
+import { reportRouter } from './routes/reports.js';
 const app = express()
 
 const __filename = fileURLToPath(import.meta.url); // get the resolved path to the file
@@ -37,6 +38,7 @@ app.use('/course', courseRouter)
 app.use('/backup', backupRouter)
 app.use('/room', roomRouter)
 app.use('/meet', meetRouter)
+app.use('/report', reportRouter)
 
 
 await startDb()

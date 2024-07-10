@@ -6,8 +6,8 @@ const Courses = new Schema({
         required: true
     },
     teacher: {
-        type: String,
-        required: true
+        type: Schema.Types.ObjectId,
+        ref: 'users',
     },
     hours: {
         type: String,
