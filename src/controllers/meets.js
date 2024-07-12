@@ -7,7 +7,7 @@ export class meetController {
         try {
             const { meetId, date, endDate, courseId, isForInscribe, getLasts } = req.query
 
-            const filter = {}
+            const filter = { status: { $nin: 'cancelled' } }
 
             if (meetId) {
                 filter._id = meetId
@@ -27,7 +27,8 @@ export class meetController {
                     {
                         $match: {
                             course: { $in: courseIdArray },
-                            fullDate: { $gte: new Date() }
+                            fullDate: { $gte: new Date() },
+                            status: { $nin: 'cancelled' }
                         }
                     },
                     {
@@ -80,7 +81,7 @@ export class meetController {
 
             if (courseId) filter.course = courseId
 
-            let meetsFind = (await Meets.find(filter, { users: 0 }).populate([{ path: 'course', populate: {path:'teacher', select: '-password'} }, 'room'])).map(e => {
+            let meetsFind = (await Meets.find(filter, { users: 0 }).populate([{ path: 'course', populate: { path: 'teacher', select: '-password' } }, 'room'])).map(e => {
                 return { course: e.course, room: e.room, date: new Date(e.fullDate).toLocaleDateString(), time: new Date(e.fullDate).toLocaleTimeString().toUpperCase(), _id: e._id }
             })
 
@@ -126,22 +127,35 @@ export class meetController {
 
     static async editMeet(req, res) {
         try {
-            const { courseName, courseTeacher, courseHours, courseDescription, courseId } = req.body
+            const { meetId, courseId, roomId, dateMeet, hourMeet } = req.body
+            console.log('BODYYY ', req.body);
 
-            if (!courseId) return res.status(400).json({ error: 'Debes de enviar un curso a actualizar' })
+            if (!meetId) return res.status(400).json({ error: 'Debe de envíar un encuentro a editar' });
 
-            const courseFind = await Meets.find({ _id: courseId })
+            const meetFind = await Meets.findOne({ _id: meetId })
 
-            if (!courseFind) return res.status(400).json({ error: 'No se ha encontrado el curso' })
+            if (!meetFind) return res.status(400).json({ error: 'No se ha encontrado el encuentro asignado' });
+
             const update = {}
-            if (courseName) filter.name = courseName
-            if (courseTeacher) filter.teacher = courseTeacher
-            if (courseHours) filter.hours = courseHours
-            if (courseDescription) filter.description = courseDescription
 
-            // Realizar validaciones para username and password
 
-            await Meets.updateOne({ _id: courseId }, { $set: update })
+            if (courseId) {
+                const courseFind = await Course.findOne({ _id: courseId });
+                if (!courseFind) return res.status(400).json({ error: 'No se ha encontrando el curso asignada' });
+                update.course = courseId;
+            }
+            if (roomId) {
+                const roomFind = await Room.findOne({ _id: roomId });
+                if (!roomId) return res.status(400).json({ error: 'No se ha encontrando el aula asignada' });
+                update.room = roomId;
+            }
+            if (dateMeet && hourMeet) {
+                const fullDate = moment(dateMeet + ' ' + hourMeet, 'YYYY/MM/DD HH:mm');
+                update.fullDate = fullDate
+            }
+            console.log('UPDATE ', update);
+
+            await Meets.updateOne({ _id: meetId }, { $set: update })
 
             return res.status(202).json({ message: "Se ha creado el curso correctamente" })
 
@@ -154,15 +168,15 @@ export class meetController {
 
     static async deleteMeet(req, res) {
         try {
-            const { courseId } = req.body;
-            if (!courseId) return res.status(400).json({ error: 'Debes de enviar el curso a eliminar' });
+            const { meetId } = req.query;
+            if (!meetId) return res.status(400).json({ error: 'Debes de enviar el encuentro a eliminar' });
 
-            const courseToUpdate = Meets.findOne({ _id: userId });
+            const meetToUpdate = Meets.findOne({ _id: meetId });
 
-            if (!courseToUpdate) return res.status(400).json({ error: 'No se ha encontrado a este curso' });
+            if (!meetToUpdate) return res.status(400).json({ error: 'No se ha encontrado a este encuentro' });
 
-            await Meets.updateOne({ _id: courseId }, { $set: { active: false } });
-            return res.status(202).json({ message: 'Usuario Actualizado' });
+            await Meets.updateOne({ _id: meetId }, { $set: { status: 'cancelled' } });
+            return res.status(202).json({ message: 'Meet Eliminado' });
 
         } catch (error) {
             if (error.message) return res.status(400).json({ error: error.message });
