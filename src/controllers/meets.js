@@ -7,7 +7,7 @@ export class meetController {
         try {
             const { meetId, date, endDate, courseId, isForInscribe, getLasts } = req.query
 
-            const filter = { status: { $nin: 'cancelled' } }
+            const filter = { status: { $nin: ['cancelled'] } }
 
             if (meetId) {
                 filter._id = meetId
@@ -28,7 +28,7 @@ export class meetController {
                         $match: {
                             course: { $in: courseIdArray },
                             fullDate: { $gte: new Date() },
-                            status: { $nin: 'cancelled' }
+                            status: { $nin: ['cancelled'] }
                         }
                     },
                     {
